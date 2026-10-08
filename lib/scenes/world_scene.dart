@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:flame/camera.dart';
@@ -15,15 +16,19 @@ import '../components/wall.dart';
 // Trava a posição da câmera dentro dos limites do mapa, considerando o zoom
 // (o `considerViewport` do CameraComponent.setBounds não leva o zoom em conta
 // e acaba deixando a câmera vazar para fora do mapa quando ele é != 1).
+// Em telas grandes o zoom sobe o suficiente para o mapa sempre cobrir a tela inteira.
 class _MapBoundsBehavior extends Component with ParentIsA<Viewfinder> {
   final Vector2 mapSize;
-  _MapBoundsBehavior(this.mapSize) : super(priority: 1000);
+  final double baseZoom;
+  _MapBoundsBehavior(this.mapSize, {required this.baseZoom}) : super(priority: 1000);
 
   @override
   void update(double dt) {
     super.update(dt);
     final viewportSize = parent.camera.viewport.size;
-    final zoom = parent.zoom;
+    final minZoom = max(viewportSize.x / mapSize.x, viewportSize.y / mapSize.y);
+    final zoom = max(baseZoom, minZoom);
+    if (parent.zoom != zoom) parent.zoom = zoom;
     final halfW = viewportSize.x / zoom / 2;
     final halfH = viewportSize.y / zoom / 2;
 
@@ -38,8 +43,9 @@ class _MapBoundsBehavior extends Component with ParentIsA<Viewfinder> {
       minY = maxY = mapSize.y / 2;
     }
 
-    parent.position.x = parent.position.x.clamp(minX, maxX);
-    parent.position.y = parent.position.y.clamp(minY, maxY);
+    // `Viewfinder.position` devolve uma cópia: é preciso atribuir um novo vetor
+    final pos = parent.position;
+    parent.position = Vector2(pos.x.clamp(minX, maxX), pos.y.clamp(minY, maxY));
   }
 }
 
@@ -122,9 +128,8 @@ class WorldScene extends Component {
     
     
     // Opcional: Trava a câmera nos limites do mapa para ela não mostrar o fundo fora do laboratório
-    camera.viewfinder.zoom = 4.0;
 
-    camera.viewfinder.add(_MapBoundsBehavior(map.size));
+    camera.viewfinder.add(_MapBoundsBehavior(map.size, baseZoom: 4.0));
 
     // 4. Joystick virtual (HUD fixo na tela) para celular/tablet
     if (kShowTouchControls) {

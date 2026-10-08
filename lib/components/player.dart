@@ -11,7 +11,6 @@ import 'wall.dart';
 class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks, HasGameRef<ChemQuestGame> {
   Vector2 velocity = Vector2.zero();
   final double speed = 100.0; // Velocidade de movimento (pixels por segundo)
-  Vector2 _lastPosition = Vector2.zero();
 
   late final SpriteComponent _visual;
   double _animTime = 0.0;
@@ -44,14 +43,33 @@ class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks,
 
   @override
   void update(double dt) {
-    _lastPosition = position.clone();
     super.update(dt);
     _applyJoystick();
-    // Atualiza a posição baseada na velocidade e no tempo (dt)
-    position += velocity * speed * dt;
+    _moveAndSlide(dt);
 
     _animTime += dt;
     _updateAnimation(dt);
+  }
+
+  // Move um eixo por vez: se bater numa parede, cancela só aquele eixo,
+  // então o jogador "escorrega" ao longo da parede em vez de travar.
+  void _moveAndSlide(double dt) {
+    final delta = velocity * speed * dt;
+
+    position.x += delta.x;
+    if (_hitsWall()) position.x -= delta.x;
+
+    position.y += delta.y;
+    if (_hitsWall()) position.y -= delta.y;
+  }
+
+  bool _hitsWall() {
+    // Mesma área da hitbox (14x14 centralizada no jogador)
+    final body = Rect.fromCenter(center: Offset(position.x, position.y), width: 14, height: 14);
+    for (final wall in parent?.children.whereType<Wall>() ?? const <Wall>[]) {
+      if (body.overlaps(wall.toRect())) return true;
+    }
+    return false;
   }
 
   void _applyJoystick() {
@@ -98,7 +116,7 @@ class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks,
       _visual.angle = tilt;
     } else {
       // Animação de respiração: escala sobe e desce devagar quando parado.
-      const breathFrequency = 3.0;
+      const breathFrequency = 5.0;
       final breath = sin(_animTime * breathFrequency);
 
       final breathScaleY = 1.0 + (breath * 0.04);
@@ -107,17 +125,6 @@ class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks,
       _visual.position = Vector2(size.x / 2, size.y / 2);
       _visual.scale = Vector2(breathScaleX * facingSign, breathScaleY);
       _visual.angle = 0.0;
-    }
-  }
-
-  @override
-  void onCollision(Set<Vector2> intersectionPoints, PositionComponent other) {
-    super.onCollision(intersectionPoints, other);
-
-    // Se o objeto no qual batemos for uma Wall (Parede)
-    if (other is Wall) {
-      // Impede o movimento voltando pra posição do frame anterior
-      position = _lastPosition;
     }
   }
 

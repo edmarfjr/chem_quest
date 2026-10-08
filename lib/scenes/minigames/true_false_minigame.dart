@@ -180,7 +180,7 @@ class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>
         () => gameRef.restartMinigame('minigame_cards'),
       ));
     } else {
-      scoreText.text = 'ESPAÇO: voltar | R: reiniciar';
+      scoreText.text = 'ESC: voltar | R: reiniciar';
     }
   }
 
@@ -202,7 +202,7 @@ class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>
       gameRef.restartMinigame('minigame_cards');
       return false;
     }
-    if (keysPressed.contains(LogicalKeyboardKey.space)) {
+    if (event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.escape)) {
       gameRef.router.pop();
       return false;
     }

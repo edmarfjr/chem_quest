@@ -70,8 +70,9 @@ class MoleculeTarget extends PositionComponent with CollisionCallbacks, HasGameR
   late Sprite sprite;
   late TextComponent textComp;
   final VoidCallback onComplete; // Avisa a cena principal que foi completada
+  final VoidCallback onMiss; // Avisa a cena principal que foi atingido com o elemento errado
 
-  MoleculeTarget({required this.data, required Vector2 position, required this.direction, required this.onComplete})
+  MoleculeTarget({required this.data, required Vector2 position, required this.direction, required this.onComplete, required this.onMiss})
       : super(position: position, size: Vector2(80, 80), anchor: Anchor.center);
 
   @override
@@ -140,6 +141,8 @@ class MoleculeTarget extends PositionComponent with CollisionCallbacks, HasGameR
         Future.delayed(const Duration(milliseconds: 500), () {
           if (isMounted) removeFromParent();
         });
+      } else {
+        onMiss(); // Elemento errado: o jogador perde uma vida
       }
     }
   }
@@ -202,6 +205,10 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
   bool gameOver = false;
   late ShooterPlayer shooter;
 
+  final int maxLives = 3;
+  late int lives = maxLives;
+  late TextComponent livesUI;
+
   // No celular os botões substituem as dicas de teclado
   String get _ammoText => kShowTouchControls
       ? 'Munição: ${ammoTypes[currentAmmoIndex]}'
@@ -228,8 +235,16 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
       textRenderer: TextPaint(style: const TextStyle(fontFamily: kPixelFont, color: Palette.branco)),
     );
     
+    livesUI = TextComponent(
+      text: 'Vidas: $lives',
+      position: Vector2(size.x / 2, 20),
+      anchor: Anchor.topCenter,
+      textRenderer: TextPaint(style: const TextStyle(fontFamily: kPixelFont, color: Palette.branco)),
+    );
+
     add(elementUI);
     add(scoreUI);
+    add(livesUI);
 
     shooter = ShooterPlayer(position: Vector2(size.x / 2, size.y - 50), getAmmo: () => ammoTypes[currentAmmoIndex]);
     add(shooter);
@@ -279,6 +294,7 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
       position: Vector2(100, 100),
       direction: 1, // Começa indo pra direita
       onComplete: handleTargetCompleted,
+      onMiss: handleMiss,
     ));
 
     // 2. Gás Carbônico (Falta C)
@@ -287,6 +303,7 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
       position: Vector2(size.x - 100, 160),
       direction: -1, // Começa indo pra esquerda
       onComplete: handleTargetCompleted,
+      onMiss: handleMiss,
     ));
 
     // 3. Metano (Falta H)
@@ -295,27 +312,40 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
       position: Vector2(size.x / 2, 220),
       direction: 1,
       onComplete: handleTargetCompleted,
+      onMiss: handleMiss,
     ));
   }
 
   void handleTargetCompleted() {
+    if (gameOver) return;
     targetsCompleted++;
     scoreUI.text = 'Completadas: $targetsCompleted / $totalTargets';
 
-    if (targetsCompleted >= totalTargets) {
-      gameOver = true;
-      add(TextComponent(
-        text: kShowTouchControls ? 'LABORATÓRIO LIMPO!' : 'LABORATÓRIO LIMPO!\nESC: sair | R: reiniciar',
-        position: Vector2(size.x / 2, size.y / 2),
-        anchor: Anchor.center,
-        textRenderer: TextPaint(style: const TextStyle(color: Palette.jade, fontSize: 32, fontWeight: FontWeight.bold, fontFamily: kPixelFont)),
+    if (targetsCompleted >= totalTargets) _endGame(true);
+  }
+
+  void handleMiss() {
+    if (gameOver) return;
+    lives--;
+    livesUI.text = 'Vidas: $lives';
+
+    if (lives <= 0) _endGame(false);
+  }
+
+  void _endGame(bool won) {
+    gameOver = true;
+    final title = won ? 'LABORATÓRIO LIMPO!' : 'SEM VIDAS! FALHOU!';
+    add(TextComponent(
+      text: kShowTouchControls ? title : '$title\nESC: sair | R: reiniciar',
+      position: Vector2(size.x / 2, size.y / 2),
+      anchor: Anchor.center,
+      textRenderer: TextPaint(style: TextStyle(color: won ? Palette.jade : Palette.vermelho, fontSize: 32, fontWeight: FontWeight.bold, fontFamily: kPixelFont)),
+    ));
+    if (kShowTouchControls) {
+      add(touchRestartButton(
+        Vector2(size.x / 2, size.y / 2 + 50),
+        () => gameRef.restartMinigame('minigame_shooter'),
       ));
-      if (kShowTouchControls) {
-        add(touchRestartButton(
-          Vector2(size.x / 2, size.y / 2 + 50),
-          () => gameRef.restartMinigame('minigame_shooter'),
-        ));
-      }
     }
   }
 

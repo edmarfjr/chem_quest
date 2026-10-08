@@ -57,9 +57,9 @@
 </data>
  </layer>
  <objectgroup id="3" name="Colisoes" visible="0">
-  <object id="5" x="0.565217" y="0.076087" width="15.5" height="319.5"/>
-  <object id="9" x="463.977" y="0.159091" width="16.1364" height="319.5"/>
-  <object id="11" x="16.087" y="-0.0434783" width="447.864" height="16.087"/>
+  <object id="5" x="0.565217" y="0.076087" width="7.83333" height="319.5"/>
+  <object id="9" x="473.31" y="0.159091" width="6.80307" height="319.5"/>
+  <object id="11" x="9.42033" y="-0.0434783" width="463.531" height="11.4203"/>
   <object id="12" x="16.1391" y="303.901" width="447.864" height="16.087"/>
   <object id="13" x="96" y="16" width="16.25" height="48.5"/>
   <object id="14" x="192" y="16" width="16.25" height="48.5"/>
@@ -70,7 +70,7 @@
   <object id="35" x="352" y="16" width="64" height="32"/>
   <object id="36" x="352" y="48" width="16" height="16"/>
   <object id="37" x="400" y="48" width="16" height="16"/>
-  <object id="41" x="16" y="144" width="447.864" height="16.087"/>
+  <object id="41" x="9" y="148" width="463.531" height="12.087"/>
   <object id="42" x="114" y="16.25" width="4.875" height="31.5"/>
   <object id="43" x="119.25" y="22" width="65.5" height="8.25"/>
   <object id="44" x="185" y="16" width="5" height="32.125"/>
