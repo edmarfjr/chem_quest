@@ -1,0 +1,18 @@
+workflows:
+  android-apk:
+    name: Android APK
+    instance_type: linux_x2
+    max_build_duration: 30
+    environment:
+      # Mesma versão usada no desenvolvimento (Dart 3.10.8, compatível com flame 1.35.1 / flame_tiled 3.0.11)
+      flutter: 3.38.9
+      java: 17
+    scripts:
+      - name: Instalar dependências
+        script: flutter pub get
+      - name: Analisar código
+        script: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Gerar APK (release)
+        script: flutter build apk --release --build-number=$PROJECT_BUILD_NUMBER
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
