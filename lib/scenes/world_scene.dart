@@ -11,6 +11,7 @@ import '../components/minigame_trigger.dart';
 import '../components/player.dart';
 import '../components/touch_controls.dart';
 import '../utils/palette.dart';
+import '../utils/tiled_utils.dart';
 import '../components/wall.dart';
 
 // Trava a posição da câmera dentro dos limites do mapa, considerando o zoom
@@ -63,29 +64,7 @@ class WorldScene extends Component {
     // Lembre-se de ter o arquivo assets/tiles/laboratorio.tmx
     final map = await TiledComponent.load('lab1.tmx', Vector2.all(16),useAtlas: false);
 
-    //final dynamic renderMap = map.tileMap;
-    
-    try {
-      for (final layer in map.tileMap.renderableLayers) {
-        final dynamic dynLayer = layer;
-        
-        // Tenta na versão atual do pacote (propriedade 'batch')
-        try {
-          dynLayer.batch?.paint?.filterQuality = FilterQuality.none;
-          dynLayer.batch?.paint?.isAntiAlias = false;
-        } catch (_) {}
-        
-        // Tenta nas versões antigas do pacote (propriedade 'batches')
-        try {
-          if (dynLayer.batches != null) {
-            for (final batch in dynLayer.batches.values) {
-              batch.paint?.filterQuality = FilterQuality.none;
-              batch.paint?.isAntiAlias = false;
-            }
-          }
-        } catch (_) {}
-      }
-    } catch (_) {}
+    makeTiledPixelPerfect(map);
 
     world.add(map);
 

@@ -3,6 +3,18 @@ import 'package:flutter/material.dart';
 /// Fonte padrão (pixelada) usada em todos os textos do jogo.
 const String kPixelFont = 'Pixel';
 
+/// Contorno preto (sombra nas 8 direções) para os textos ficarem legíveis sobre qualquer fundo.
+const List<Shadow> kTextOutline = [
+  Shadow(color: Palette.preto, offset: Offset(2, 0)),
+  Shadow(color: Palette.preto, offset: Offset(-2, 0)),
+  Shadow(color: Palette.preto, offset: Offset(0, 2)),
+  Shadow(color: Palette.preto, offset: Offset(0, -2)),
+  Shadow(color: Palette.preto, offset: Offset(2, 2)),
+  Shadow(color: Palette.preto, offset: Offset(-2, -2)),
+  Shadow(color: Palette.preto, offset: Offset(2, -2)),
+  Shadow(color: Palette.preto, offset: Offset(-2, 2)),
+];
+
 class Palette {
   // --- 16 Cores Padrão (Herdadas do PICO-8) ---
   static const Color preto = Color(0xFF000000);        // 00 - black

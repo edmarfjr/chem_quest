@@ -1,8 +1,12 @@
+import 'dart:math';
+import 'dart:ui' show PictureRecorder;
 //import 'dart:ui' hide TextStyle, FontWeight;
 import 'package:chem_quest/utils/palette.dart';
 import 'package:flutter/material.dart';
 import 'package:flame/components.dart';
 import 'package:flame/collisions.dart'; // NOVO: Para usar hitboxes
+import 'package:flame/extensions.dart';
+import 'package:flame_tiled/flame_tiled.dart';
 //import 'package:flame/events.dart';
 import 'package:flutter/services.dart';
 import '../../game.dart';
@@ -84,16 +88,7 @@ class MoleculeTarget extends PositionComponent with CollisionCallbacks, HasGameR
 
     textComp = TextComponent(
       text: data.display,
-      textRenderer: TextPaint(style: const TextStyle(color: Palette.branco, fontSize: 24, fontWeight: FontWeight.bold, fontFamily: kPixelFont
-      ,shadows: [Shadow(color: Palette.preto, offset: Offset(1, 1)),
-          Shadow(color: Palette.preto, offset: Offset(-1, -1)),
-          Shadow(color: Palette.preto, offset: Offset(1, -1)),
-          Shadow(color: Palette.preto, offset: Offset(-1, 1)),
-          Shadow(color: Palette.preto, offset: Offset(0, 1)),
-          Shadow(color: Palette.preto, offset: Offset(0, -1)),
-          Shadow(color: Palette.preto, offset: Offset(1, 0)),
-          Shadow(color: Palette.preto, offset: Offset(-1, 0)),] 
-      )),
+      textRenderer: TextPaint(style: const TextStyle(color: Palette.branco, fontSize: 24, fontWeight: FontWeight.bold, fontFamily: kPixelFont, shadows: kTextOutline)),
       anchor: Anchor.center,
       position: Vector2(size.x / 2, size.y / 2 - 8),
     );
@@ -118,8 +113,17 @@ class MoleculeTarget extends PositionComponent with CollisionCallbacks, HasGameR
     }
   }
 
+  // Sombra: elipse escura sob o sprite
+  static final Paint _shadowPaint = Paint()..color = Palette.preto;
+
   @override
   void render(Canvas canvas) {
+    final shadow = Rect.fromCenter(
+      center: Offset(size.x / 2 - 2, size.y * 0.95),
+      width: size.x * 0.8,
+      height: size.y * 0.2,
+    );
+    canvas.drawOval(shadow, _shadowPaint);
     sprite.render(canvas, size: size);
   }
 
@@ -155,13 +159,27 @@ class ShooterPlayer extends PositionComponent with HasGameRef<ChemQuestGame>, Ke
   int touchDirection = 0; // -1, 0 ou 1, controlado pelos botões de toque
   final String Function() getAmmo;
   late Sprite sprite;
+  late TextComponent _ammoLabel;
 
   ShooterPlayer({required Vector2 position, required this.getAmmo}) : super(position: position, size: Vector2(96, 96), anchor: Anchor.center);
 
   @override
   Future<void> onLoad() async {
     sprite = await gameRef.loadSprite('playerTiro.png');
+
+    // Letra do elemento da munição atual, no centro do sprite
+    _ammoLabel = TextComponent(
+      text: _ammoSymbol,
+      anchor: Anchor.center,
+      position: size / 2 + Vector2(0, 16),
+      textRenderer: TextPaint(
+        style: const TextStyle(fontFamily: kPixelFont, color: Palette.branco, fontSize: 24, fontWeight: FontWeight.bold, shadows: kTextOutline),
+      ),
+    );
+    add(_ammoLabel);
   }
+
+  String get _ammoSymbol => getAmmo()[0]; // 'H (Hidrogênio)' -> 'H'
 
   @override
   void render(Canvas canvas) { sprite.render(canvas, size: size); }
@@ -169,6 +187,7 @@ class ShooterPlayer extends PositionComponent with HasGameRef<ChemQuestGame>, Ke
   @override
   void update(double dt) {
     super.update(dt);
+    if (_ammoLabel.text != _ammoSymbol) _ammoLabel.text = _ammoSymbol;
     position.x += (direction + touchDirection).clamp(-1, 1) * speed * dt;
     if (position.x < 20) position.x = 20;
     if (position.x > gameRef.size.x - 20) position.x = gameRef.size.x - 20;
@@ -208,6 +227,8 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
   final int maxLives = 3;
   late int lives = maxLives;
   late TextComponent livesUI;
+  SpriteComponent? _background; // mapa shootingGalery.tmx usado como fundo
+  final Vector2 _mapSize = Vector2.zero(); // tamanho original do mapa, em pixels
 
   // No celular os botões substituem as dicas de teclado
   String get _ammoText => kShowTouchControls
@@ -220,26 +241,50 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
     elementUI.text = _ammoText;
   }
 
+  // Amplia o mapa para cobrir a tela inteira (mantendo a proporção) e o centraliza
+  void _layoutBackground() {
+    final bg = _background;
+    if (bg == null) return;
+    final scale = max(size.x / _mapSize.x, size.y / _mapSize.y);
+    bg.size = _mapSize * scale;
+    bg.position = (size - bg.size) / 2;
+  }
+
   @override
   Future<void> onLoad() async {
     size = gameRef.size;
 
+    // O mapa é desenhado uma vez em tamanho original e depois ampliado como uma imagem só.
+    // Ampliar tile por tile com escala fracionada deixa frestas entre eles.
+    final map = await TiledComponent.load('shootingGalery.tmx', Vector2.all(16), useAtlas: false);
+    _mapSize.setFrom(map.size);
+    final recorder = PictureRecorder();
+    map.tileMap.render(Canvas(recorder));
+    final image = await recorder.endRecording().toImageSafe(_mapSize.x.toInt(), _mapSize.y.toInt());
+
+    final bg = SpriteComponent(sprite: Sprite(image), priority: -1); // atrás de todo o resto
+    bg.paint.filterQuality = FilterQuality.none;
+    bg.paint.isAntiAlias = false;
+    _background = bg;
+    add(bg);
+    _layoutBackground();
+
     elementUI = TextComponent(
       text: _ammoText,
       position: Vector2(20, 20),
-      textRenderer: TextPaint(style: const TextStyle(fontFamily: kPixelFont, color: Palette.branco)),
+      textRenderer: TextPaint(style: const TextStyle(fontFamily: kPixelFont, color: Palette.branco, fontSize: 24, shadows: kTextOutline)),
     );
     scoreUI = TextComponent(
       text: 'Completadas: 0 / $totalTargets',
-      position: Vector2(size.x - 250, 20),
-      textRenderer: TextPaint(style: const TextStyle(fontFamily: kPixelFont, color: Palette.branco)),
+      position: Vector2(size.x - 'Completadas: 0 / $totalTargets'.length * 12 - 20, 20),
+      textRenderer: TextPaint(style: const TextStyle(fontFamily: kPixelFont, color: Palette.branco, fontSize: 24, shadows: kTextOutline)),
     );
     
     livesUI = TextComponent(
       text: 'Vidas: $lives',
       position: Vector2(size.x / 2, 20),
       anchor: Anchor.topCenter,
-      textRenderer: TextPaint(style: const TextStyle(fontFamily: kPixelFont, color: Palette.branco)),
+      textRenderer: TextPaint(style: const TextStyle(fontFamily: kPixelFont, color: Palette.branco, fontSize: 24, shadows: kTextOutline)),
     );
 
     add(elementUI);
@@ -291,7 +336,7 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
     // 1. Água (Falta O)
     add(MoleculeTarget(
       data: MoleculeData('H2_', 'O', 'H2O'),
-      position: Vector2(100, 100),
+      position: Vector2(100, 180),
       direction: 1, // Começa indo pra direita
       onComplete: handleTargetCompleted,
       onMiss: handleMiss,
@@ -300,7 +345,7 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
     // 2. Gás Carbônico (Falta C)
     add(MoleculeTarget(
       data: MoleculeData('_O2', 'C', 'CO2'),
-      position: Vector2(size.x - 100, 160),
+      position: Vector2(size.x - 100, 260),
       direction: -1, // Começa indo pra esquerda
       onComplete: handleTargetCompleted,
       onMiss: handleMiss,
@@ -309,7 +354,7 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
     // 3. Metano (Falta H)
     add(MoleculeTarget(
       data: MoleculeData('CH3_', 'H', 'CH4'),
-      position: Vector2(size.x / 2, 220),
+      position: Vector2(size.x / 2, 340),
       direction: 1,
       onComplete: handleTargetCompleted,
       onMiss: handleMiss,
@@ -339,7 +384,7 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
       text: kShowTouchControls ? title : '$title\nESC: sair | R: reiniciar',
       position: Vector2(size.x / 2, size.y / 2),
       anchor: Anchor.center,
-      textRenderer: TextPaint(style: TextStyle(color: won ? Palette.jade : Palette.vermelho, fontSize: 32, fontWeight: FontWeight.bold, fontFamily: kPixelFont)),
+      textRenderer: TextPaint(style: TextStyle(color: won ? Palette.jade : Palette.vermelho, fontSize: 32, fontWeight: FontWeight.bold, fontFamily: kPixelFont, shadows: kTextOutline)),
     ));
     if (kShowTouchControls) {
       add(touchRestartButton(
@@ -353,6 +398,7 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
   void onGameResize(Vector2 size) {
     super.onGameResize(size);
     this.size = size;
+    _layoutBackground();
   }
 
   @override

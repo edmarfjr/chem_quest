@@ -1,8 +1,8 @@
 import 'dart:ui' hide TextStyle, FontWeight;
 import 'dart:math';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide PointerMoveEvent;
 import 'package:flame/components.dart';
-import 'package:flame/effects.dart';
+import 'package:flame/flame.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/services.dart';
 import '../../game.dart';
@@ -27,47 +27,121 @@ final List<ChemElement> allElements = [
   ChemElement('K', 0.82),
 ];
 
-// 2. O BURACO (Apenas visual)
+// Spritesheet mole.png: 4 quadros de 24x24 lado a lado
+//   0 = buraco vazio | 1 e 2 = toupeira subindo | 3 = toupeira totalmente fora
+const double _moleFrameSrc = 24;
+const double _moleSpriteSize = 72; // 3x o tamanho original, mantém o pixel art nítido
+final Paint _pixelPaint = Paint()..filterQuality = FilterQuality.none..isAntiAlias = false;
+
+Future<List<Sprite>> _loadMoleFrames() async {
+  final sheet = await Flame.images.load('mole.png');
+  return List.generate(
+    4,
+    (i) => Sprite(sheet, srcPosition: Vector2(i * _moleFrameSrc, 0), srcSize: Vector2.all(_moleFrameSrc)),
+  );
+}
+
+// 2. O BURACO (Apenas visual: primeiro quadro da animação)
 class Hole extends PositionComponent {
-  Hole({required Vector2 position}) : super(position: position, size: Vector2(80, 40), anchor: Anchor.center);
+  late final Sprite _sprite;
+
+  Hole({required Vector2 position}) : super(position: position, size: Vector2.all(_moleSpriteSize), anchor: Anchor.center);
+
+  @override
+  Future<void> onLoad() async {
+    _sprite = (await _loadMoleFrames())[0];
+  }
 
   @override
   void render(Canvas canvas) {
-    // Desenha uma elipse preta para simular o buraco
-    canvas.drawOval(size.toRect(), Paint()..color = Colors.black87);
+    _sprite.render(canvas, size: size, overridePaint: _pixelPaint);
   }
+}
+
+// Texto do elemento: só aparece com a toupeira totalmente fora do buraco
+class _ElementLabel extends TextComponent with HasVisibility {
+  _ElementLabel({required String text, required Vector2 position})
+      : super(
+          text: text,
+          position: position,
+          anchor: Anchor.center,
+          textRenderer: TextPaint(
+            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, fontFamily: kPixelFont, shadows: kTextOutline),
+          ),
+        );
 }
 
 // 3. A TOUPEIRA (O elemento clicável)
 class Mole extends PositionComponent with TapCallbacks {
+  static const int _lastFrame = 3;
+  static const double _frameTime = 0.07; // segundos por quadro
+
   final ChemElement element;
   final Function(Mole) onTapMole;
-  
+
   bool isJumping = false; // Trava para evitar cliques enquanto está debaixo da terra
 
-  Mole({required this.element, required Vector2 position, required this.onTapMole}) 
-      : super(position: position, size: Vector2(60, 60), anchor: Anchor.center);
+  late final List<Sprite> _frames;
+  late final _ElementLabel _label;
+  int _frame = 0;
+
+  // Animação por quadros: fila de quadros a exibir e o que fazer ao terminar
+  final List<int> _queue = [];
+  double _timer = 0;
+  VoidCallback? _onDone;
+
+  Mole({required this.element, required Vector2 position, required this.onTapMole})
+      : super(position: position, size: Vector2.all(_moleSpriteSize), anchor: Anchor.center);
 
   @override
   Future<void> onLoad() async {
-    add(TextComponent(
-      text: element.symbol,
-      textRenderer: TextPaint(style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, fontFamily: kPixelFont)),
-      anchor: Anchor.center,
-      position: Vector2(size.x / 2, size.y / 2),
-    ));
-    
-    scale = Vector2.zero();
-    add(ScaleEffect.to(Vector2.all(1.0), EffectController(duration: 0.3, curve: Curves.easeOutBack)));
+    _frames = await _loadMoleFrames();
+
+    _label = _ElementLabel(text: element.symbol, position: Vector2(size.x / 2, size.y * 0.5));
+    _label.isVisible = false;
+    add(_label);
+
+    _play(const [0, 1, 2, _lastFrame]); // sai do buraco
+  }
+
+  void _play(List<int> frames, {VoidCallback? onDone}) {
+    _queue
+      ..clear()
+      ..addAll(frames);
+    _onDone = onDone;
+    _timer = 0;
+    _showNextFrame();
+  }
+
+  void _showNextFrame() {
+    _frame = _queue.removeAt(0);
+    _label.isVisible = _frame == _lastFrame;
+    if (_queue.isEmpty) {
+      final done = _onDone;
+      _onDone = null;
+      done?.call();
+    }
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    if (_queue.isEmpty) return;
+    _timer += dt;
+    while (_timer >= _frameTime && _queue.isNotEmpty) {
+      _timer -= _frameTime;
+      _showNextFrame();
+    }
   }
 
   @override
   void render(Canvas canvas) {
-    canvas.drawCircle(Offset(size.x / 2, size.y / 2), size.x / 2, Paint()..color = Colors.brown);
+    _frames[_frame].render(canvas, size: size, overridePaint: _pixelPaint);
   }
 
   @override
   void onTapDown(TapDownEvent event) {
+    event.continuePropagation = true; // a cena também precisa do toque para balançar o martelo
     if (!isJumping) {
       onTapMole(this);
     }
@@ -76,41 +150,69 @@ class Mole extends PositionComponent with TapCallbacks {
   // NOVO: Função que faz a toupeira mudar de buraco com animação
   void jumpTo(Vector2 newPosition) {
     isJumping = true; // Impede o clique
-    
-    // 1. Encolhe (entra no buraco)
-    add(ScaleEffect.to(
-      Vector2.zero(), 
-      EffectController(duration: 0.15),
-      onComplete: () {
-        // 2. Muda a coordenada instantaneamente enquanto está invisível
-        position = newPosition; 
-        
-        // 3. Cresce novamente (sai no novo buraco)
-        add(ScaleEffect.to(
-          Vector2.all(1.0), 
-          EffectController(duration: 0.15, curve: Curves.easeOutBack),
-          onComplete: () => isJumping = false // Libera o clique novamente
-        ));
-      }
-    ));
+
+    // 1. Entra no buraco
+    _play(const [2, 1, 0], onDone: () {
+      // 2. Muda a coordenada enquanto está escondida
+      position = newPosition;
+
+      // 3. Sai no novo buraco
+      _play(const [1, 2, _lastFrame], onDone: () => isJumping = false); // Libera o clique novamente
+    });
   }
 
   void hide() {
     isJumping = true;
-    add(ScaleEffect.to(
-      Vector2.zero(), 
-      EffectController(duration: 0.2), 
-      onComplete: () => removeFromParent()
-    ));
+    _play(const [2, 1, 0], onDone: removeFromParent);
+  }
+}
+
+// MARTELO: segue o ponteiro e inclina para baixo ao clicar/tocar
+class Hammer extends PositionComponent with HasVisibility {
+  static const double _spriteSize = 48; // sprite 16x16 ampliado 3x
+  static const double _swingDuration = 0.2; // segundos
+  static const double _idleAngle = 0.0; // o sprite já vem inclinado 45° para a esquerda
+  static const double _hitAngle = -80 * pi / 180; // 80° anti-horário: a cabeça desce para a esquerda, "batendo"
+
+  late final Sprite _sprite;
+  double _swingTime = _swingDuration; // >= duração significa parado
+
+  Hammer() : super(size: Vector2.all(_spriteSize), anchor: Anchor.center, priority: 200) {
+    angle = _idleAngle;
+  }
+
+  @override
+  Future<void> onLoad() async {
+    _sprite = Sprite(await Flame.images.load('hammer.png'));
+  }
+
+  void swing() => _swingTime = 0;
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    if (_swingTime >= _swingDuration) return;
+
+    _swingTime += dt;
+    final p = (_swingTime / _swingDuration).clamp(0.0, 1.0);
+    // Desce rápido (40% do tempo) e volta devagar
+    final k = p < 0.4 ? p / 0.4 : 1 - (p - 0.4) / 0.6;
+    angle = _idleAngle + (_hitAngle - _idleAngle) * k;
+  }
+
+  @override
+  void render(Canvas canvas) {
+    _sprite.render(canvas, size: size, overridePaint: _pixelPaint);
   }
 }
 
 // 4. A CENA DO MINIGAME
-class WhackAMoleMinigame extends PositionComponent with HasGameRef<ChemQuestGame>, KeyboardHandler {
+class WhackAMoleMinigame extends PositionComponent with HasGameRef<ChemQuestGame>, KeyboardHandler, TapCallbacks, PointerMoveCallbacks {
   final Random rng = Random();
   
   late TextComponent instructionUI;
   late TextComponent scoreUI;
+  late Hammer _hammer;
 
   final List<Vector2> holePositions = [];
   Mole? moleA;
@@ -138,6 +240,9 @@ class WhackAMoleMinigame extends PositionComponent with HasGameRef<ChemQuestGame
     
     add(instructionUI);
     add(scoreUI);
+
+    _hammer = Hammer()..isVisible = false; // aparece no primeiro movimento/toque
+    add(_hammer);
 
     if (kShowTouchControls) {
       add(touchExitButton(size, () => gameRef.router.pop()));
@@ -250,6 +355,34 @@ class WhackAMoleMinigame extends PositionComponent with HasGameRef<ChemQuestGame
     } else {
       instructionUI.text = 'ESC: voltar ao laboratório | R: reiniciar';
     }
+  }
+
+  // O martelo substitui o cursor do mouse
+  @override
+  void onMount() {
+    super.onMount();
+    gameRef.mouseCursor = SystemMouseCursors.none;
+  }
+
+  @override
+  void onRemove() {
+    gameRef.mouseCursor = MouseCursor.defer;
+    super.onRemove();
+  }
+
+  void _moveHammer(Vector2 position) {
+    _hammer
+      ..position = position
+      ..isVisible = true;
+  }
+
+  @override
+  void onPointerMove(PointerMoveEvent event) => _moveHammer(event.localPosition);
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    _moveHammer(event.localPosition);
+    _hammer.swing();
   }
 
   @override
