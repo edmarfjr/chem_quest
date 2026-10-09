@@ -1,15 +1,13 @@
-import 'dart:math';
-import 'dart:ui' show PictureRecorder;
 //import 'dart:ui' hide TextStyle, FontWeight;
 import 'package:chem_quest/utils/palette.dart';
 import 'package:flutter/material.dart';
 import 'package:flame/components.dart';
 import 'package:flame/collisions.dart'; // NOVO: Para usar hitboxes
-import 'package:flame/extensions.dart';
-import 'package:flame_tiled/flame_tiled.dart';
 //import 'package:flame/events.dart';
 import 'package:flutter/services.dart';
 import '../../game.dart';
+import '../../components/virtual_screen.dart';
+import '../../utils/tiled_utils.dart';
 import '../../components/touch_controls.dart';
 
 // --- DADOS DA MOLÉCULA ---
@@ -107,8 +105,8 @@ class MoleculeTarget extends PositionComponent with CollisionCallbacks, HasGameR
     if (position.x < size.x / 2) {
       position.x = size.x / 2;
       direction = 1;
-    } else if (position.x > gameRef.size.x - size.x / 2) {
-      position.x = gameRef.size.x - size.x / 2;
+    } else if (position.x > VirtualScreen.designWidth - size.x / 2) {
+      position.x = VirtualScreen.designWidth - size.x / 2;
       direction = -1;
     }
   }
@@ -190,7 +188,7 @@ class ShooterPlayer extends PositionComponent with HasGameRef<ChemQuestGame>, Ke
     if (_ammoLabel.text != _ammoSymbol) _ammoLabel.text = _ammoSymbol;
     position.x += (direction + touchDirection).clamp(-1, 1) * speed * dt;
     if (position.x < 20) position.x = 20;
-    if (position.x > gameRef.size.x - 20) position.x = gameRef.size.x - 20;
+    if (position.x > VirtualScreen.designWidth - 20) position.x = VirtualScreen.designWidth - 20;
   }
 
   @override
@@ -211,7 +209,7 @@ class ShooterPlayer extends PositionComponent with HasGameRef<ChemQuestGame>, Ke
 }
 
 // 4. A CENA DO MINIGAME
-class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQuestGame>, KeyboardHandler {
+class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQuestGame>, KeyboardHandler, VirtualScreen {
   
   late TextComponent elementUI;
   late TextComponent scoreUI;
@@ -227,8 +225,8 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
   final int maxLives = 3;
   late int lives = maxLives;
   late TextComponent livesUI;
-  SpriteComponent? _background; // mapa shootingGalery.tmx usado como fundo
-  final Vector2 _mapSize = Vector2.zero(); // tamanho original do mapa, em pixels
+  TouchHud? _hud; // botões de toque (só no celular)
+  TiledBackground? _background; // mapa shootingGalery.tmx usado como fundo
 
   // No celular os botões substituem as dicas de teclado
   String get _ammoText => kShowTouchControls
@@ -241,33 +239,13 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
     elementUI.text = _ammoText;
   }
 
-  // Amplia o mapa para cobrir a tela inteira (mantendo a proporção) e o centraliza
-  void _layoutBackground() {
-    final bg = _background;
-    if (bg == null) return;
-    final scale = max(size.x / _mapSize.x, size.y / _mapSize.y);
-    bg.size = _mapSize * scale;
-    bg.position = (size - bg.size) / 2;
-  }
-
   @override
   Future<void> onLoad() async {
-    size = gameRef.size;
+    fitToScreen(gameRef.size);
 
-    // O mapa é desenhado uma vez em tamanho original e depois ampliado como uma imagem só.
-    // Ampliar tile por tile com escala fracionada deixa frestas entre eles.
-    final map = await TiledComponent.load('shootingGalery.tmx', Vector2.all(16), useAtlas: false);
-    _mapSize.setFrom(map.size);
-    final recorder = PictureRecorder();
-    map.tileMap.render(Canvas(recorder));
-    final image = await recorder.endRecording().toImageSafe(_mapSize.x.toInt(), _mapSize.y.toInt());
-
-    final bg = SpriteComponent(sprite: Sprite(image), priority: -1); // atrás de todo o resto
-    bg.paint.filterQuality = FilterQuality.none;
-    bg.paint.isAntiAlias = false;
-    _background = bg;
-    add(bg);
-    _layoutBackground();
+    _background = await TiledBackground.load('shootingGalery.tmx');
+    add(_background!);
+    _background!.fit(screenRect);
 
     elementUI = TextComponent(
       text: _ammoText,
@@ -300,43 +278,34 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
     spawnTargets();
   }
 
+  // Botões em coordenadas reais da tela (não escalam com a cena), presos aos cantos
   void _addTouchControls() {
-    final buttonSize = Vector2(80, 80);
-    final y = size.y - 60;
-    add(TouchButton(
-      label: '<',
-      position: Vector2(64, y),
-      size: buttonSize,
-      onPress: () => shooter.touchDirection -= 1,
-      onRelease: () => shooter.touchDirection += 1,
-    ));
-    add(TouchButton(
-      label: '>',
-      position: Vector2(160, y),
-      size: buttonSize,
-      onPress: () => shooter.touchDirection += 1,
-      onRelease: () => shooter.touchDirection -= 1,
-    ));
-    add(TouchButton(
-      label: 'ATIRAR',
-      position: Vector2(size.x - 72, y),
-      size: Vector2(110, 80),
-      onPress: shooter.shoot,
-    ));
-    add(TouchButton(
-      label: 'TROCAR',
-      position: Vector2(size.x - 72, y - 96),
-      size: Vector2(110, 56),
-      onTap: nextAmmo,
-    ));
-    add(touchExitButton(size, () => gameRef.router.pop()));
+    final hud = TouchHud(gameRef.size);
+    hud.addItem(MovePad(onChange: (direction) => shooter.touchDirection = direction), (s) => Vector2(24, s.y - 100));
+    hud.addItem(
+      TouchButton(label: 'ATIRAR', position: Vector2.zero(), size: Vector2(110, 80), onPress: shooter.shoot),
+      (s) => Vector2(s.x - 72, s.y - 60),
+    );
+    hud.addItem(
+      TouchButton(label: 'TROCAR', position: Vector2.zero(), size: Vector2(110, 56), onTap: nextAmmo),
+      (s) => Vector2(s.x - 72, s.y - 156),
+    );
+    hud.addItem(touchExitButton(Vector2.zero(), () => gameRef.router.pop()), (s) => Vector2(s.x - 16, 16));
+    _hud = hud;
+    gameRef.add(hud);
+  }
+
+  @override
+  void onRemove() {
+    _hud?.removeFromParent();
+    super.onRemove();
   }
 
   void spawnTargets() {
     // 1. Água (Falta O)
     add(MoleculeTarget(
       data: MoleculeData('H2_', 'O', 'H2O'),
-      position: Vector2(100, 180),
+      position: Vector2(100, 140),
       direction: 1, // Começa indo pra direita
       onComplete: handleTargetCompleted,
       onMiss: handleMiss,
@@ -345,7 +314,7 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
     // 2. Gás Carbônico (Falta C)
     add(MoleculeTarget(
       data: MoleculeData('_O2', 'C', 'CO2'),
-      position: Vector2(size.x - 100, 260),
+      position: Vector2(size.x - 100, 220),
       direction: -1, // Começa indo pra esquerda
       onComplete: handleTargetCompleted,
       onMiss: handleMiss,
@@ -354,7 +323,7 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
     // 3. Metano (Falta H)
     add(MoleculeTarget(
       data: MoleculeData('CH3_', 'H', 'CH4'),
-      position: Vector2(size.x / 2, 340),
+      position: Vector2(size.x / 2, 300),
       direction: 1,
       onComplete: handleTargetCompleted,
       onMiss: handleMiss,
@@ -387,24 +356,23 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
       textRenderer: TextPaint(style: TextStyle(color: won ? Palette.jade : Palette.vermelho, fontSize: 32, fontWeight: FontWeight.bold, fontFamily: kPixelFont, shadows: kTextOutline)),
     ));
     if (kShowTouchControls) {
-      add(touchRestartButton(
-        Vector2(size.x / 2, size.y / 2 + 50),
-        () => gameRef.restartMinigame('minigame_shooter'),
-      ));
+      _hud?.addItem(
+        touchRestartButton(Vector2.zero(), () => gameRef.restartMinigame('minigame_shooter')),
+        (s) => Vector2(s.x / 2, s.y / 2 + 50),
+      );
     }
   }
 
   @override
   void onGameResize(Vector2 size) {
-    super.onGameResize(size);
-    this.size = size;
-    _layoutBackground();
+    super.onGameResize(size); // VirtualScreen reposiciona/escala a cena
+    _background?.fit(screenRect);
   }
 
   @override
   void render(Canvas canvas) {
     super.render(canvas);
-    canvas.drawRect(size.toRect(), Paint()..color = Palette.azulEsc);
+    canvas.drawRect(screenRect, Paint()..color = Palette.azulEsc);
   }
 
   @override

@@ -112,7 +112,7 @@ class WorldScene extends Component {
 
     // 4. Joystick virtual (HUD fixo na tela) para celular/tablet
     if (kShowTouchControls) {
-      final joystick = JoystickComponent(
+      final joystick = SafeJoystick(
         knob: CircleComponent(radius: 24, paint: Paint()..color = Palette.branco.withValues(alpha: 0.7)),
         background: CircleComponent(radius: 56, paint: Paint()..color = Palette.preto.withValues(alpha: 0.35)),
         margin: const EdgeInsets.only(left: 40, bottom: 40),

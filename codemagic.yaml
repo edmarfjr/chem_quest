@@ -7,7 +7,16 @@ workflows:
       # Mesma versão usada no desenvolvimento (Dart 3.10.8, compatível com flame 1.35.1 / flame_tiled 3.0.11)
       flutter: 3.38.9
       java: 17
+      # Keystore enviada em Teams > Code signing identities > Android keystores, com este nome de referência
+      android_signing:
+        - chem_quest_keystore
     scripts:
+      - name: Verificar keystore de assinatura
+        script: |
+          if [ -z "$CM_KEYSTORE_PATH" ]; then
+            echo "Keystore não configurada: o APK sairia assinado com a chave de debug e não atualizaria o app instalado."
+            exit 1
+          fi
       - name: Instalar dependências
         script: flutter pub get
       - name: Analisar código

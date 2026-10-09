@@ -5,10 +5,12 @@ import 'dart:ui' hide TextStyle, FontWeight;
 import 'package:flutter/material.dart'; 
 
 import 'package:flame/components.dart';
+import 'package:flame/flame.dart';
 import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/services.dart';
 import '../../game.dart';
+import '../../components/virtual_screen.dart';
 import '../../components/touch_controls.dart';
 import '../../utils/palette.dart';
 
@@ -16,14 +18,16 @@ import '../../utils/palette.dart';
 class QuestionCard {
   final String text;
   final bool isTrue;
-  QuestionCard(this.text, this.isTrue);
+  final String image; // arte da carta (em assets/images)
+  QuestionCard(this.text, this.isTrue, this.image);
 }
 
 // 2. O COMPONENTE VISUAL DA CARTA (Nova classe!)
 class CardComponent extends PositionComponent {
   final String text;
+  final String image;
 
-  CardComponent({required this.text, required Vector2 position, required Vector2 size}) 
+  CardComponent({required this.text, required this.image, required Vector2 position, required Vector2 size})
       : super(position: position, size: size, anchor: Anchor.center);
 
   @override
@@ -40,6 +44,17 @@ class CardComponent extends PositionComponent {
         style: const TextStyle(color: Palette.preto, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: kPixelFont),
       ),
     ));
+
+    // Ilustração na parte de baixo da carta (arte 24x24 ampliada 6x, mantém o pixel art nítido)
+    final art = SpriteComponent(
+      sprite: Sprite(await Flame.images.load(image)),
+      size: Vector2.all(24 * 6),
+      anchor: Anchor.center,
+      position: Vector2(size.x / 2, size.y * 1.45),
+    );
+    art.paint.filterQuality = FilterQuality.none;
+    art.paint.isAntiAlias = false;
+    add(art);
   }
 
   @override
@@ -56,7 +71,7 @@ class CardComponent extends PositionComponent {
 }
 
 // 3. A CENA DO MINIGAME
-class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>, KeyboardHandler {
+class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>, KeyboardHandler, VirtualScreen {
   late List<QuestionCard> deck;
   int currentCardIndex = 0;
   int score = 0;
@@ -68,14 +83,14 @@ class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>
 
   @override
   Future<void> onLoad() async {
-    size = gameRef.size;
+    fitToScreen(gameRef.size);
 
     deck = [
-      QuestionCard("A água ferve a 100°C ao nível do mar.", true),
-      QuestionCard("O símbolo químico do Ouro é Ag.", false),
-      QuestionCard("O oxigênio é o gás mais abundante na atmosfera.", false),
-      QuestionCard("O próton possui carga positiva.", true),
-      QuestionCard("Misturar um ácido e uma base gera sal e água.", true),
+      QuestionCard("A água ferve a 100°C ao nível do mar.", true, 'imgCartas_Animation 1_0.png'),
+      QuestionCard("O símbolo químico do Ouro é Ag.", false, 'imgCartas_Animation 1_1.png'),
+      QuestionCard("O oxigênio é o gás mais abundante na atmosfera.", false, 'imgCartas_Animation 1_2.png'),
+      QuestionCard("O próton possui carga positiva.", true, 'imgCartas_Animation 1_3.png'),
+      QuestionCard("Misturar um ácido e uma base gera sal e água.", true, 'imgCartas_Animation 1_4.png'),
     ];
     deck.shuffle();
 
@@ -115,6 +130,7 @@ class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>
 
     activeCard = CardComponent(
       text: deck[currentCardIndex].text,
+      image: deck[currentCardIndex].image,
       position: Vector2(size.x / 2, -100), // Começa fora da tela (em cima)
       size: Vector2(250, 200),
     );
@@ -185,15 +201,9 @@ class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>
   }
 
   @override
-  void onGameResize(Vector2 size) {
-    super.onGameResize(size);
-    this.size = size;
-  }
-
-  @override
   void render(Canvas canvas) {
     super.render(canvas);
-    canvas.drawRect(size.toRect(), Paint()..color = Palette.azulEsc);
+    canvas.drawRect(screenRect, Paint()..color = Palette.azulEsc);
   }
 
   @override

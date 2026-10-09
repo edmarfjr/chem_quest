@@ -6,8 +6,10 @@ import 'package:flame/flame.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/services.dart';
 import '../../game.dart';
+import '../../components/virtual_screen.dart';
 import '../../components/touch_controls.dart';
 import '../../utils/palette.dart';
+import '../../utils/tiled_utils.dart';
 
 // 1. DADOS DOS ELEMENTOS (Símbolo e Eletronegatividade de Pauling)
 class ChemElement {
@@ -169,7 +171,7 @@ class Mole extends PositionComponent with TapCallbacks {
 
 // MARTELO: segue o ponteiro e inclina para baixo ao clicar/tocar
 class Hammer extends PositionComponent with HasVisibility {
-  static const double _spriteSize = 48; // sprite 16x16 ampliado 3x
+  static const double _spriteSize = 96; // sprite 16x16 ampliado 3x
   static const double _swingDuration = 0.2; // segundos
   static const double _idleAngle = 0.0; // o sprite já vem inclinado 45° para a esquerda
   static const double _hitAngle = -80 * pi / 180; // 80° anti-horário: a cabeça desce para a esquerda, "batendo"
@@ -207,12 +209,13 @@ class Hammer extends PositionComponent with HasVisibility {
 }
 
 // 4. A CENA DO MINIGAME
-class WhackAMoleMinigame extends PositionComponent with HasGameRef<ChemQuestGame>, KeyboardHandler, TapCallbacks, PointerMoveCallbacks {
+class WhackAMoleMinigame extends PositionComponent with HasGameRef<ChemQuestGame>, KeyboardHandler, TapCallbacks, PointerMoveCallbacks, VirtualScreen {
   final Random rng = Random();
   
   late TextComponent instructionUI;
   late TextComponent scoreUI;
   late Hammer _hammer;
+  TiledBackground? _background; // mapa whackAmole.tmx usado como fundo
 
   final List<Vector2> holePositions = [];
   Mole? moleA;
@@ -232,7 +235,11 @@ class WhackAMoleMinigame extends PositionComponent with HasGameRef<ChemQuestGame
 
   @override
   Future<void> onLoad() async {
-    size = gameRef.size;
+    fitToScreen(gameRef.size);
+
+    _background = await TiledBackground.load('whackAmole.tmx');
+    add(_background!);
+    _background!.fit(screenRect);
 
     final defaultTextRenderer = TextPaint(style: const TextStyle(fontFamily: kPixelFont));
     instructionUI = TextComponent(text: 'Acerte o MAIS ELETRONEGATIVO!', position: Vector2(size.x / 2, 40), anchor: Anchor.center, textRenderer: defaultTextRenderer);
@@ -387,14 +394,14 @@ class WhackAMoleMinigame extends PositionComponent with HasGameRef<ChemQuestGame
 
   @override
   void onGameResize(Vector2 size) {
-    super.onGameResize(size);
-    this.size = size;
+    super.onGameResize(size); // VirtualScreen reposiciona/escala a cena
+    _background?.fit(screenRect);
   }
 
   @override
   void render(Canvas canvas) {
     super.render(canvas);
-    canvas.drawRect(size.toRect(), Paint()..color = const Color(0xFF2E7D32));
+    canvas.drawRect(screenRect, Paint()..color = const Color(0xFF2E7D32));
   }
 
   @override
