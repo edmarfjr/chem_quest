@@ -25,3 +25,32 @@ workflows:
         script: flutter build apk --release --build-number=$PROJECT_BUILD_NUMBER
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
+
+  web-itch:
+    name: Web (itch.io)
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      flutter: 3.38.9
+    scripts:
+      - name: Instalar dependências
+        script: flutter pub get
+      - name: Analisar código
+        script: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Gerar build web
+        # --no-web-resources-cdn: inclui o CanvasKit no pacote (o jogo não depende de CDN externa)
+        # --pwa-strategy=none: sem service worker, para o itch.io não servir uma versão antiga em cache
+        # O Flutter só aceita base-href começando e terminando em "/", então o ajuste para "./" vem depois
+        script: flutter build web --release --base-href / --no-web-resources-cdn --pwa-strategy=none
+      - name: Ajustar caminhos para o itch.io
+        # No itch.io o jogo roda numa subpasta, então os arquivos precisam ser relativos ao index.html
+        script: |
+          perl -pi -e 's|<base href="/">|<base href="./">|' build/web/index.html
+          grep -q '<base href="./">' build/web/index.html || { echo "Falha ao ajustar o base href"; exit 1; }
+      - name: Gerar zip para o itch.io
+        # O index.html precisa ficar na raiz do zip (não dentro de uma pasta)
+        script: |
+          cd build/web
+          zip -r ../../chem_quest_web.zip .
+    artifacts:
+      - chem_quest_web.zip
