@@ -241,3 +241,18 @@ class SafeJoystick extends JoystickComponent {
     }
   }
 }
+
+/// Botão do mapa (canto inferior direito) para abrir o minigame do objeto em que o jogador encostou.
+/// Fica no HUD da câmera e só aparece quando [isVisible] é verdadeiro.
+class WorldActionButton extends TouchButton with HasVisibility {
+  WorldActionButton({required VoidCallback onTap})
+      : super(label: 'JOGAR', position: Vector2.zero(), size: Vector2(110, 80), onTap: onTap) {
+    isVisible = false;
+  }
+
+  @override
+  void onGameResize(Vector2 gameSize) {
+    super.onGameResize(gameSize);
+    position = Vector2(gameSize.x - 72, gameSize.y - 60);
+  }
+}

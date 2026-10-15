@@ -60,12 +60,12 @@ class CardComponent extends PositionComponent {
   @override
   void render(Canvas canvas) {
     // Desenha o fundo da carta (um retângulo branco com bordas arredondadas)
-    final rrect = RRect.fromRectAndCorners(Rect.fromLTWH(0, 0, size.x, size.y *2 - 16));
-    final rrectCarta = RRect.fromRectAndCorners(Rect.fromLTWH(-8, -8, size.x + 16, size.y *2));
-    canvas.drawRRect(rrectCarta, Paint()..color = Palette.branco);
+    final rrect = RRect.fromRectAndCorners(Rect.fromLTWH(0, 0, size.x, size.y *2 - 16),topLeft: const Radius.circular(16), topRight: const Radius.circular(16), bottomLeft: const Radius.circular(16), bottomRight: const Radius.circular(16));
+    final rrectCarta = RRect.fromRectAndCorners(Rect.fromLTWH(-8, -8, size.x + 16, size.y *2),topLeft: const Radius.circular(16), topRight: const Radius.circular(16), bottomLeft: const Radius.circular(16), bottomRight: const Radius.circular(16));
+    canvas.drawRRect(rrectCarta, Paint()..color = Palette.cinza);
     canvas.drawRRect(rrectCarta, Paint()..color = Palette.preto..style = PaintingStyle.stroke..strokeWidth = 2);
 
-    canvas.drawRRect(rrect, Paint()..color = Palette.branco);
+   // canvas.drawRRect(rrect, Paint()..color = Palette.branco);
     canvas.drawRRect(rrect, Paint()..color = Palette.preto..style = PaintingStyle.stroke..strokeWidth = 2);
   }
 }

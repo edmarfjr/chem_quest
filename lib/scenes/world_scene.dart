@@ -53,6 +53,8 @@ class _MapBoundsBehavior extends Component with ParentIsA<Viewfinder> {
 class WorldScene extends Component {
   late final World world;
   late final CameraComponent camera;
+  late final Player _player;
+  WorldActionButton? _actionButton;
 
   @override
   Future<void> onLoad() async {
@@ -96,6 +98,7 @@ class WorldScene extends Component {
 
     // 2. Instancia o jogador
     final player = Player();
+    _player = player;
     
     // Posiciona o jogador no meio do mapa (opcional, calcule baseado no tamanho do mapa)
     player.position = Vector2(14*16,6*16);
@@ -119,8 +122,18 @@ class WorldScene extends Component {
       );
       camera.viewport.add(joystick);
       player.joystick = joystick;
+
+      // Botão para abrir o minigame quando o jogador encosta num objeto interagível
+      _actionButton = WorldActionButton(onTap: () => player.nearbyTrigger?.start());
+      camera.viewport.add(_actionButton!);
     }
 
     add(camera);
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    _actionButton?.isVisible = _player.nearbyTrigger != null;
   }
 }

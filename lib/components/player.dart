@@ -6,6 +6,7 @@ import 'package:flame/input.dart';
 import 'package:flutter/services.dart';
 import 'package:flame/collisions.dart'; // Importar colisões
 import '../game.dart';
+import 'minigame_trigger.dart';
 import 'wall.dart';
 
 class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks, HasGameRef<ChemQuestGame> {
@@ -15,6 +16,9 @@ class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks,
   late final SpriteComponent _visual;
   double _animTime = 0.0;
   bool _facingLeft = false;
+
+  /// Objeto de minigame em que o jogador está encostado (null se nenhum)
+  MinigameTrigger? nearbyTrigger;
 
   /// Joystick virtual (controles de toque). Se null, só o teclado move o jogador.
   JoystickComponent? joystick;
@@ -130,6 +134,11 @@ class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks,
 
   @override
   bool onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
+    // Z abre o minigame do objeto em que o jogador está encostado
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyZ) {
+      nearbyTrigger?.start();
+    }
+
     double dirX = 0.0;
     double dirY = 0.0;
     // Movimentação horizontal
