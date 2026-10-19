@@ -6,7 +6,7 @@ import 'package:flame/input.dart';
 import 'package:flutter/services.dart';
 import 'package:flame/collisions.dart'; // Importar colisões
 import '../game.dart';
-import 'minigame_trigger.dart';
+import 'interactive_object.dart';
 import 'wall.dart';
 
 class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks, HasGameRef<ChemQuestGame> {
@@ -17,8 +17,11 @@ class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks,
   double _animTime = 0.0;
   bool _facingLeft = false;
 
-  /// Objeto de minigame em que o jogador está encostado (null se nenhum)
-  MinigameTrigger? nearbyTrigger;
+  /// Objeto interagível (minigame, NPC...) em que o jogador está encostado (null se nenhum)
+  InteractiveObject? nearbyObject;
+
+  /// Parado durante diálogos: não anda e fica na animação de respiração
+  bool frozen = false;
 
   /// Joystick virtual (controles de toque). Se null, só o teclado move o jogador.
   JoystickComponent? joystick;
@@ -58,6 +61,7 @@ class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks,
   // Move um eixo por vez: se bater numa parede, cancela só aquele eixo,
   // então o jogador "escorrega" ao longo da parede em vez de travar.
   void _moveAndSlide(double dt) {
+    if (frozen) return;
     final delta = velocity * speed * dt;
 
     position.x += delta.x;
@@ -97,7 +101,7 @@ class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks,
   }
 
   void _updateAnimation(double dt) {
-    final isWalking = velocity.length > 0;
+    final isWalking = !frozen && velocity.length > 0;
     final facingSign = _facingLeft ? -1.0 : 1.0;
 
     if (isWalking) {
@@ -134,9 +138,9 @@ class Player extends PositionComponent with KeyboardHandler, CollisionCallbacks,
 
   @override
   bool onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
-    // Z abre o minigame do objeto em que o jogador está encostado
+    // Z aciona o objeto em que o jogador está encostado (abre o minigame, fala com o NPC...)
     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyZ) {
-      nearbyTrigger?.start();
+      nearbyObject?.interact();
     }
 
     double dirX = 0.0;

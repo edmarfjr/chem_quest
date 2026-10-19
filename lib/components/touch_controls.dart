@@ -44,6 +44,7 @@ class TouchButton extends PositionComponent with TapCallbacks {
   final VoidCallback? onRelease;
   final VoidCallback? onTap;
   bool _pressed = false;
+  late final TextComponent labelComponent; // permite trocar o texto depois (ex.: JOGAR/FALAR)
 
   TouchButton({
     required this.label,
@@ -57,7 +58,8 @@ class TouchButton extends PositionComponent with TapCallbacks {
 
   @override
   Future<void> onLoad() async {
-    add(_buttonLabel(label, size / 2));
+    labelComponent = _buttonLabel(label, size / 2);
+    add(labelComponent);
   }
 
   @override
@@ -242,7 +244,8 @@ class SafeJoystick extends JoystickComponent {
   }
 }
 
-/// Botão do mapa (canto inferior direito) para abrir o minigame do objeto em que o jogador encostou.
+/// Botão do mapa (canto inferior direito) para interagir com o objeto em que o jogador encostou
+/// (o texto muda: JOGAR para minigames, FALAR para NPCs).
 /// Fica no HUD da câmera e só aparece quando [isVisible] é verdadeiro.
 class WorldActionButton extends TouchButton with HasVisibility {
   WorldActionButton({required VoidCallback onTap})

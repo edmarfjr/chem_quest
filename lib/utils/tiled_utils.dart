@@ -5,29 +5,22 @@ import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
 import 'package:flame_tiled/flame_tiled.dart';
 
-/// Desliga a suavização dos tiles para o pixel art ficar nítido (inclusive quando o mapa é ampliado).
-void makeTiledPixelPerfect(TiledComponent map) {
-  try {
-    for (final layer in map.tileMap.renderableLayers) {
-      final dynamic dynLayer = layer;
+/// Desenha o mapa Tiled inteiro, uma vez e em tamanho original, numa imagem.
+///
+/// Ampliar tile por tile (zoom da câmera ou escala da cena) deixa frestas entre eles por causa do
+/// arredondamento; ampliar uma imagem só não deixa.
+Future<Image> renderTiledMapToImage(TiledComponent map) {
+  final recorder = PictureRecorder();
+  map.tileMap.render(Canvas(recorder));
+  return recorder.endRecording().toImageSafe(map.size.x.toInt(), map.size.y.toInt());
+}
 
-      // Tenta na versão atual do pacote (propriedade 'batch')
-      try {
-        dynLayer.batch?.paint?.filterQuality = FilterQuality.none;
-        dynLayer.batch?.paint?.isAntiAlias = false;
-      } catch (_) {}
-
-      // Tenta nas versões antigas do pacote (propriedade 'batches')
-      try {
-        if (dynLayer.batches != null) {
-          for (final batch in dynLayer.batches.values) {
-            batch.paint?.filterQuality = FilterQuality.none;
-            batch.paint?.isAntiAlias = false;
-          }
-        }
-      } catch (_) {}
-    }
-  } catch (_) {}
+/// O mapa Tiled como um sprite único (sem frestas entre os tiles e com pixels nítidos).
+Future<SpriteComponent> tiledMapAsSprite(TiledComponent map) async {
+  final sprite = SpriteComponent(sprite: Sprite(await renderTiledMapToImage(map)), size: map.size.clone());
+  sprite.paint.filterQuality = FilterQuality.none;
+  sprite.paint.isAntiAlias = false;
+  return sprite;
 }
 
 /// Fundo de cena a partir de um mapa Tiled (.tmx).
@@ -44,10 +37,7 @@ class TiledBackground extends SpriteComponent {
 
   static Future<TiledBackground> load(String tmx, {double tileSize = 16}) async {
     final map = await TiledComponent.load(tmx, Vector2.all(tileSize), useAtlas: false);
-    final recorder = PictureRecorder();
-    map.tileMap.render(Canvas(recorder));
-    final image = await recorder.endRecording().toImageSafe(map.size.x.toInt(), map.size.y.toInt());
-    return TiledBackground._(image, map.size.clone());
+    return TiledBackground._(await renderTiledMapToImage(map), map.size.clone());
   }
 
   /// Amplia o mapa para cobrir [area] inteira (mantendo a proporção) e o centraliza nela.

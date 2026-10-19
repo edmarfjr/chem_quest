@@ -7,7 +7,9 @@ import 'package:flame/input.dart';
 import 'package:flutter/painting.dart' show EdgeInsets;
 import 'package:flame/rendering.dart';
 import 'package:flame_tiled/flame_tiled.dart';
+import '../components/dialog_box.dart';
 import '../components/minigame_trigger.dart';
+import '../components/npc_trigger.dart';
 import '../components/player.dart';
 import '../components/touch_controls.dart';
 import '../utils/palette.dart';
@@ -50,11 +52,21 @@ class _MapBoundsBehavior extends Component with ParentIsA<Viewfinder> {
   }
 }
 
+// Falas dos NPCs (objetos "npc1", "npc2"... da camada Interacoes do mapa). Trechos entre *asteriscos* ficam destacados.
+const String _npcWelcome =
+    'Bem vindo ao chem quest. Nesse jogo você vai aprender sobre a cultura indígena e como os seus saberes influenciaram na ciência de hoje.';
+const Map<String, String> _npcDialogues = {
+  'npc1': _npcWelcome,
+  'npc2': 'Para nunca esquecer a fila de eletronegatividade vamos lembrar do macete\n'
+      '*F*ui *O*ntem *N*o *Cl*ube, *Br*iguei *I* *S*ai *C*orrendo *P*ro *H*ospital',
+};
+
 class WorldScene extends Component {
   late final World world;
   late final CameraComponent camera;
   late final Player _player;
   WorldActionButton? _actionButton;
+  late final DialogBox _dialog;
 
   @override
   Future<void> onLoad() async {
@@ -66,9 +78,8 @@ class WorldScene extends Component {
     // Lembre-se de ter o arquivo assets/tiles/laboratorio.tmx
     final map = await TiledComponent.load('lab1.tmx', Vector2.all(16),useAtlas: false);
 
-    makeTiledPixelPerfect(map);
-
-    world.add(map);
+    // O mapa vira uma imagem só: com o zoom da câmera, tiles desenhados um a um deixam linhas entre eles
+    world.add(await tiledMapAsSprite(map));
 
     final collisionLayer = map.tileMap.getLayer<ObjectGroup>('Colisoes');
     
@@ -83,16 +94,31 @@ class WorldScene extends Component {
       }
     }
 
-    final interactionLayer = map.tileMap.getLayer<ObjectGroup>('Interacoes');
-    
-    if (interactionLayer != null) {
-      for (final obj in interactionLayer.objects) {
-        final trigger = MinigameTrigger(
-          position: Vector2(obj.x, obj.y),
-          size: Vector2(obj.width, obj.height),
-          minigameRoute: obj.name, // Pega o nome "minigame_cards" que você colocou no Tiled
-        );
-        world.add(trigger);
+    // Objetos interagíveis: "npcN" abre um diálogo; os demais da camada Interacoes abrem o minigame de mesmo nome
+    for (final layer in map.tileMap.map.layers.whereType<ObjectGroup>()) {
+      for (final obj in layer.objects) {
+        final name = obj.name.toLowerCase();
+        final width = obj.width > 0 ? obj.width : 16.0;
+        final height = obj.height > 0 ? obj.height : 16.0;
+
+        if (RegExp(r'^npc\d+$').hasMatch(name)) {
+          // Objeto com imagem (tile) tem a origem no canto de baixo; retângulo tem no de cima.
+          // A área de interação é um pouco maior que o NPC, para o jogador poder falar encostando ao lado dele.
+          const margin = 6.0;
+          final top = obj.gid != null ? obj.y - height : obj.y;
+          world.add(NpcTrigger(
+            position: Vector2(obj.x - margin, top - margin),
+            size: Vector2(width + margin * 2, height + margin * 2),
+            dialogue: _npcDialogues[name] ?? _npcWelcome,
+            onTalk: _talk,
+          ));
+        } else if (layer.name == 'Interacoes') {
+          world.add(MinigameTrigger(
+            position: Vector2(obj.x, obj.y),
+            size: Vector2(width, height),
+            minigameRoute: obj.name, // Pega o nome "minigame_cards" que você colocou no Tiled
+          ));
+        }
       }
     }
 
@@ -101,7 +127,7 @@ class WorldScene extends Component {
     _player = player;
     
     // Posiciona o jogador no meio do mapa (opcional, calcule baseado no tamanho do mapa)
-    player.position = Vector2(14*16,6*16);
+    player.position = Vector2(2*16,9*16);
     world.add(player);
 
     // 3. Configura a câmera
@@ -112,6 +138,10 @@ class WorldScene extends Component {
     // Opcional: Trava a câmera nos limites do mapa para ela não mostrar o fundo fora do laboratório
 
     camera.viewfinder.add(_MapBoundsBehavior(map.size, baseZoom: 4.0));
+
+    // Caixa de diálogo dos NPCs (HUD fixo na tela)
+    _dialog = DialogBox();
+    camera.viewport.add(_dialog);
 
     // 4. Joystick virtual (HUD fixo na tela) para celular/tablet
     if (kShowTouchControls) {
@@ -124,16 +154,35 @@ class WorldScene extends Component {
       player.joystick = joystick;
 
       // Botão para abrir o minigame quando o jogador encosta num objeto interagível
-      _actionButton = WorldActionButton(onTap: () => player.nearbyTrigger?.start());
+      _actionButton = WorldActionButton(onTap: () => player.nearbyObject?.interact());
       camera.viewport.add(_actionButton!);
     }
 
     add(camera);
   }
 
+  // Primeira interação abre a caixa de texto; interagir de novo completa o texto ou fecha a caixa
+  void _talk(String dialogue) {
+    if (_dialog.isOpen) {
+      _dialog.advance();
+    } else {
+      _dialog.show(dialogue);
+    }
+  }
+
   @override
   void update(double dt) {
     super.update(dt);
-    _actionButton?.isVisible = _player.nearbyTrigger != null;
+    // O jogador fica parado enquanto o diálogo está aberto
+    _player.frozen = _dialog.isOpen;
+
+    final button = _actionButton;
+    if (button != null) {
+      final nearby = _player.nearbyObject;
+      button.isVisible = nearby != null && !_dialog.isOpen;
+      if (nearby != null && button.labelComponent.text != nearby.actionLabel) {
+        button.labelComponent.text = nearby.actionLabel;
+      }
+    }
   }
 }
