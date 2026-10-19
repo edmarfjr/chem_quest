@@ -18,9 +18,27 @@ import '../../utils/palette.dart';
 class QuestionCard {
   final String text;
   final bool isTrue;
-  final String image; // arte da carta (em assets/images)
+  final String image; // arte da carta (em assets/images); se o arquivo não existir, a carta mostra um aviso
   QuestionCard(this.text, this.isTrue, this.image);
 }
+
+// Perguntas de química (minigame_cards)
+final List<QuestionCard> chemistryQuestions = [
+  QuestionCard("A água ferve a 100°C ao nível do mar.", true, 'imgCartas_Animation 1_0.png'),
+  QuestionCard("O símbolo químico do Ouro é Ag.", false, 'imgCartas_Animation 1_1.png'),
+  QuestionCard("O oxigênio é o gás mais abundante na atmosfera.", false, 'imgCartas_Animation 1_2.png'),
+  QuestionCard("O próton possui carga positiva.", true, 'imgCartas_Animation 1_3.png'),
+  QuestionCard("Misturar um ácido e uma base gera sal e água.", true, 'imgCartas_Animation 1_4.png'),
+];
+
+// Perguntas sobre plantas medicinais (minigame_cards2)
+final List<QuestionCard> medicinalPlantsQuestions = [
+  QuestionCard("A babosa (Aloe vera) é usada para aliviar queimaduras leves na pele.", true, 'planta_1.png'),
+  QuestionCard("O chá de boldo é tradicionalmente usado para aliviar problemas de digestão.", true, 'planta_2.png'),
+  QuestionCard("O chá de erva-cidreira pode substituir qualquer remédio receitado pelo médico.", false, 'planta_3.png'),
+  QuestionCard("As plantas medicinais não possuem substâncias químicas.", false, 'planta_4.png'),
+  QuestionCard("A quinina, usada contra a malária, vem da casca da quina, árvore conhecida pelos povos indígenas.", true, 'planta_5.png'),
+];
 
 // 2. O COMPONENTE VISUAL DA CARTA (Nova classe!)
 class CardComponent extends PositionComponent {
@@ -46,15 +64,26 @@ class CardComponent extends PositionComponent {
     ));
 
     // Ilustração na parte de baixo da carta (arte 24x24 ampliada 6x, mantém o pixel art nítido)
-    final art = SpriteComponent(
-      sprite: Sprite(await Flame.images.load(image)),
-      size: Vector2.all(24 * 6),
-      anchor: Anchor.center,
-      position: Vector2(size.x / 2, size.y * 1.45),
-    );
-    art.paint.filterQuality = FilterQuality.none;
-    art.paint.isAntiAlias = false;
-    add(art);
+    final artCenter = Vector2(size.x / 2, size.y * 1.45);
+    Sprite? sprite;
+    try {
+      sprite = Sprite(await Flame.images.load(image));
+    } catch (_) {
+      sprite = null; // arte ainda não criada
+    }
+    if (sprite != null) {
+      final art = SpriteComponent(sprite: sprite, size: Vector2.all(24 * 6), anchor: Anchor.center, position: artCenter);
+      art.paint.filterQuality = FilterQuality.none;
+      art.paint.isAntiAlias = false;
+      add(art);
+    } else {
+      add(TextComponent(
+        text: '(arte: $image)',
+        anchor: Anchor.center,
+        position: artCenter,
+        textRenderer: TextPaint(style: const TextStyle(color: Palette.cinzaEsc, fontSize: 12, fontFamily: kPixelFont)),
+      ));
+    }
   }
 
   @override
@@ -72,6 +101,13 @@ class CardComponent extends PositionComponent {
 
 // 3. A CENA DO MINIGAME
 class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>, KeyboardHandler, VirtualScreen {
+  final List<QuestionCard> _questions;
+  final String routeName; // rota deste minigame (usada para reiniciar)
+  final String? title; // título opcional no alto da tela
+
+  TrueFalseMinigame({List<QuestionCard>? questions, this.routeName = 'minigame_cards', this.title})
+      : _questions = questions ?? chemistryQuestions;
+
   late List<QuestionCard> deck;
   int currentCardIndex = 0;
   int score = 0;
@@ -85,14 +121,7 @@ class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>
   Future<void> onLoad() async {
     fitToScreen(gameRef.size);
 
-    deck = [
-      QuestionCard("A água ferve a 100°C ao nível do mar.", true, 'imgCartas_Animation 1_0.png'),
-      QuestionCard("O símbolo químico do Ouro é Ag.", false, 'imgCartas_Animation 1_1.png'),
-      QuestionCard("O oxigênio é o gás mais abundante na atmosfera.", false, 'imgCartas_Animation 1_2.png'),
-      QuestionCard("O próton possui carga positiva.", true, 'imgCartas_Animation 1_3.png'),
-      QuestionCard("Misturar um ácido e uma base gera sal e água.", true, 'imgCartas_Animation 1_4.png'),
-    ];
-    deck.shuffle();
+    deck = List.of(_questions)..shuffle();
 
     scoreText = TextComponent(
       text: 'Pontos: $score / $pointsToWin',
@@ -100,6 +129,15 @@ class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>
       textRenderer: TextPaint(style: const TextStyle(fontFamily: kPixelFont, color: Palette.branco)),
     );
     add(scoreText);
+
+    if (title != null) {
+      add(TextComponent(
+        text: title!,
+        anchor: Anchor.topCenter,
+        position: Vector2(size.x / 2, 8),
+        textRenderer: TextPaint(style: const TextStyle(fontFamily: kPixelFont, color: Palette.branco, fontSize: 18, shadows: kTextOutline)),
+      ));
+    }
 
     // Botões
     add(AnswerButton(
@@ -193,7 +231,7 @@ class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>
       scoreText.text = 'Fim de jogo';
       add(touchRestartButton(
         Vector2(size.x / 2, size.y / 2 + 40),
-        () => gameRef.restartMinigame('minigame_cards'),
+        () => gameRef.restartMinigame(routeName),
       ));
     } else {
       scoreText.text = 'ESC: voltar | R: reiniciar';
@@ -209,7 +247,7 @@ class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>
   @override
   bool onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
     if (isGameOver && event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.keyR)) {
-      gameRef.restartMinigame('minigame_cards');
+      gameRef.restartMinigame(routeName);
       return false;
     }
     if (event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.escape)) {

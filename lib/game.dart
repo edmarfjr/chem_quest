@@ -35,6 +35,7 @@ class ChemQuestGame extends FlameGame with HasKeyboardHandlerComponents, HasColl
         // Rotas dos Minigames
         // maintainState: false descarta a cena ao sair, então cada entrada começa um jogo novo
         'minigame_cards': Route(_buildTrueFalseMinigame, maintainState: false),
+        'minigame_cards2': Route(_buildMedicinalPlantsMinigame, maintainState: false),
         'minigame_shooter': Route(_buildShootingGallery, maintainState: false),
         'minigame_whack': Route(_buildWhackAMole, maintainState: false),
         'minigame_group': Route(_buildFunctionalGroups, maintainState: false),
@@ -49,6 +50,7 @@ class ChemQuestGame extends FlameGame with HasKeyboardHandlerComponents, HasColl
   void restartMinigame(String routeName) {
     final builder = switch (routeName) {
       'minigame_cards' => _buildTrueFalseMinigame,
+      'minigame_cards2' => _buildMedicinalPlantsMinigame,
       'minigame_shooter' => _buildShootingGallery,
       'minigame_whack' => _buildWhackAMole,
       'minigame_group' => _buildFunctionalGroups,
@@ -64,6 +66,15 @@ class ChemQuestGame extends FlameGame with HasKeyboardHandlerComponents, HasColl
 
   Component _buildTrueFalseMinigame() {
     return TrueFalseMinigame(); // Chama a nossa nova classe
+  }
+
+  // Mesmo minigame de Verdadeiro ou Falso, com as perguntas sobre plantas medicinais
+  Component _buildMedicinalPlantsMinigame() {
+    return TrueFalseMinigame(
+      questions: medicinalPlantsQuestions,
+      routeName: 'minigame_cards2',
+      title: 'Plantas medicinais',
+    );
   }
 
   Component _buildShootingGallery() {

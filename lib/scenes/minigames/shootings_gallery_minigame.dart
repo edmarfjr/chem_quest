@@ -19,23 +19,28 @@ class MoleculeData {
 }
 
 // 1. O PROJÉTIL (Agora com Colisão)
+// Flecha: o círculo com o elemento é a ponta, no alto; a haste e as penas ficam atrás (embaixo)
 class Bullet extends PositionComponent with CollisionCallbacks {
+  static const double _head = 20; // diâmetro do círculo (ponta)
+  static const double _length = 70; // comprimento total da flecha
+
   final String element;
   final double speed = 400.0;
 
-  Bullet({required this.element, required Vector2 position}) 
-      : super(position: position, size: Vector2(20, 20), anchor: Anchor.center);
+  // O ponto de origem (position) é o centro do círculo, como era na bala antiga
+  Bullet({required this.element, required Vector2 position})
+      : super(position: position, size: Vector2(_head, _length), anchor: Anchor(0.5, (_head / 2) / _length));
 
   @override
   Future<void> onLoad() async {
-    // Adicionamos a Hitbox na bala
-    add(RectangleHitbox());
-    
+    // A colisão é só na ponta (círculo), como antes
+    add(RectangleHitbox(position: Vector2.zero(), size: Vector2.all(_head)));
+
     add(TextComponent(
       text: element[0], 
       textRenderer: TextPaint(style: TextStyle(color: Palette.preto, fontSize: 14, fontWeight: FontWeight.bold, fontFamily: kPixelFont)),
       anchor: Anchor.center,
-      position: Vector2(size.x / 2, size.y / 2),
+      position: Vector2(_head / 2, _head / 2),
     ));
   }
 
@@ -43,12 +48,37 @@ class Bullet extends PositionComponent with CollisionCallbacks {
   void update(double dt) {
     super.update(dt);
     position.y -= speed * dt;
-    if (position.y < -50) removeFromParent();
+    if (position.y < -(_length + 10)) removeFromParent(); // a flecha inteira já saiu da tela
   }
 
   @override
   void render(Canvas canvas) {
-    canvas.drawCircle(Offset(size.x / 2, size.y / 2), size.x / 2, Paint()..color = Palette.laranja);
+    const cx = _head / 2;
+    final outline = Paint()
+      ..color = Palette.preto
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    // Penas (atrás, embaixo)
+    for (final side in [-1.0, 1.0]) {
+      final feather = Path()
+        ..moveTo(cx, _length - 26)
+        ..lineTo(cx + side * 8, _length - 16)
+        ..lineTo(cx + side * 8, _length - 2)
+        ..lineTo(cx, _length - 12)
+        ..close();
+      canvas.drawPath(feather, Paint()..color = Palette.branco);
+      canvas.drawPath(feather, outline);
+    }
+
+    // Haste
+    final shaft = Rect.fromLTRB(cx - 2, _head - 2, cx + 2, _length - 4);
+    canvas.drawRect(shaft, Paint()..color = Palette.marromEsc);
+    canvas.drawRect(shaft, outline);
+
+    // Ponta: o círculo com o elemento
+    canvas.drawCircle(const Offset(cx, _head / 2), _head / 2, Paint()..color = Palette.laranja);
+    canvas.drawCircle(const Offset(cx, _head / 2), _head / 2, outline);
   }
 
   // Quando a bala bate em qualquer coisa
