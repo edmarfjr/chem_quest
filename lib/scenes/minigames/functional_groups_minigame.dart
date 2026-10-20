@@ -289,7 +289,7 @@ class FunctionalGroupsMinigame extends PositionComponent
         () => gameRef.restartMinigame('minigame_group'),
       ));
     } else {
-      scoreText.text = 'ESC: voltar | R: reiniciar';
+      scoreText.text = 'Q: voltar | R: reiniciar';
     }
   }
 
@@ -305,7 +305,7 @@ class FunctionalGroupsMinigame extends PositionComponent
       gameRef.restartMinigame('minigame_group');
       return false;
     }
-    if (event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.escape)) {
+    if (event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.keyQ)) {
       gameRef.router.pop();
       return false;
     }

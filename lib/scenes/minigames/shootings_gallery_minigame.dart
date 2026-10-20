@@ -380,7 +380,7 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
     gameOver = true;
     final title = won ? 'LABORATÓRIO LIMPO!' : 'SEM VIDAS! FALHOU!';
     add(TextComponent(
-      text: kShowTouchControls ? title : '$title\nESC: sair | R: reiniciar',
+      text: kShowTouchControls ? title : '$title\nQ: sair | R: reiniciar',
       position: Vector2(size.x / 2, size.y / 2),
       anchor: Anchor.center,
       textRenderer: TextPaint(style: TextStyle(color: won ? Palette.jade : Palette.vermelho, fontSize: 32, fontWeight: FontWeight.bold, fontFamily: kPixelFont, shadows: kTextOutline)),
@@ -416,7 +416,7 @@ class ShootingGalleryMinigame extends PositionComponent with HasGameRef<ChemQues
         nextAmmo();
         return false;
       }
-      if (keysPressed.contains(LogicalKeyboardKey.escape)) {
+      if (keysPressed.contains(LogicalKeyboardKey.keyQ)) {
         gameRef.router.pop();
         return false;
       }

@@ -360,7 +360,7 @@ class WhackAMoleMinigame extends PositionComponent with HasGameRef<ChemQuestGame
         () => gameRef.restartMinigame('minigame_whack'),
       ));
     } else {
-      instructionUI.text = 'ESC: voltar ao laboratório | R: reiniciar';
+      instructionUI.text = 'Q: voltar ao laboratório | R: reiniciar';
     }
   }
 
@@ -410,7 +410,7 @@ class WhackAMoleMinigame extends PositionComponent with HasGameRef<ChemQuestGame
       gameRef.restartMinigame('minigame_whack');
       return false;
     }
-    if (event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.escape)) {
+    if (event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.keyQ)) {
       gameRef.router.pop();
       return false;
     }

@@ -234,7 +234,7 @@ class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>
         () => gameRef.restartMinigame(routeName),
       ));
     } else {
-      scoreText.text = 'ESC: voltar | R: reiniciar';
+      scoreText.text = 'Q: voltar | R: reiniciar';
     }
   }
 
@@ -250,7 +250,7 @@ class TrueFalseMinigame extends PositionComponent with HasGameRef<ChemQuestGame>
       gameRef.restartMinigame(routeName);
       return false;
     }
-    if (event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.escape)) {
+    if (event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.keyQ)) {
       gameRef.router.pop();
       return false;
     }
